@@ -112,12 +112,8 @@ struct PopcornEPG: AsyncParsableCommand {
         let fileManager = FileManager.default
         let tempURL = url.appendingPathExtension("tmp")
         try data.write(to: tempURL)
-
-        if fileManager.fileExists(atPath: url.path) {
-            _ = try fileManager.replaceItemAt(url, withItemAt: tempURL)
-        } else {
-            try fileManager.moveItem(at: tempURL, to: url)
-        }
+        try? fileManager.removeItem(at: url)
+        try fileManager.moveItem(at: tempURL, to: url)
     }
 
     private func generateDates(count: Int) -> [String] {
