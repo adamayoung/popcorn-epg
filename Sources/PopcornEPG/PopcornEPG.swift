@@ -109,9 +109,15 @@ struct PopcornEPG: AsyncParsableCommand {
     }
 
     private func atomicWrite(_ data: Data, to url: URL) throws {
+        let fileManager = FileManager.default
         let tempURL = url.appendingPathExtension("tmp")
         try data.write(to: tempURL)
-        _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
+
+        if fileManager.fileExists(atPath: url.path) {
+            _ = try fileManager.replaceItemAt(url, withItemAt: tempURL)
+        } else {
+            try fileManager.moveItem(at: tempURL, to: url)
+        }
     }
 
     private func generateDates(count: Int) -> [String] {
