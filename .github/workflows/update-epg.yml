@@ -10,17 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:6.2.0-jammy
     steps:
-      - name: Get current date
-        run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Pull latest changes
-        run: git pull
+      - name: Fix git ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
@@ -34,6 +31,9 @@ jobs:
         run: swift run -c release PopcornEPG --tmdb-api-key "$TMDB_API_KEY"
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+
+      - name: Get current date
+        run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Commit and push
         run: |
