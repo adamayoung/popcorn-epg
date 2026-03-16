@@ -1,0 +1,18 @@
+.DS_Store
+.docc-build
+.swiftpm
+/.build
+/*.xcodeproj
+xcuserdata/
+.vscode
+*.xctestplan
+docs/
+info.lcov
+default.profraw
+junit-swift-testing.xml
+
+# Claude
+.claude/settings.local.json
+
+# Git worktrees
+.worktrees/

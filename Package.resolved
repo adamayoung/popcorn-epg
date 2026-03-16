@@ -1,0 +1,24 @@
+{
+  "originHash" : "795c5a9361a940a508f7e8210e6372a10ee0e5c44bd301d0cb9f97682ad0909a",
+  "pins" : [
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
+        "version" : "1.7.0"
+      }
+    },
+    {
+      "identity" : "tmdb",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adamayoung/TMDb.git",
+      "state" : {
+        "revision" : "6d8185a898fd4817e7a85f5981c422e15c457d8e",
+        "version" : "17.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}

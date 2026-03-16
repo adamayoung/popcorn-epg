@@ -1,0 +1,48 @@
+name: Update EPG
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current date
+        run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Pull latest changes
+        run: git pull
+
+      - name: Install Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Run EPG fetcher
+        run: swift run -c release PopcornEPG --tmdb-api-key "$TMDB_API_KEY"
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add epg.json epg.json.gz tmdb-cache.json
+          git diff-index --quiet HEAD || git commit -m "Updated EPG listings on $RUN_DATE"
+          git push
