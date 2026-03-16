@@ -8,6 +8,14 @@
 import ArgumentParser
 import Foundation
 
+#if canImport(Compression)
+    import Compression
+#endif
+
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 @main
 struct PopcornEPG: AsyncParsableCommand {
 
@@ -67,11 +75,37 @@ struct PopcornEPG: AsyncParsableCommand {
         print("Wrote \(outputURL.path) (\(epgData.channels.count) channels, \(epgData.dates.count) days)")
 
         let gzipURL = outputURL.appendingPathExtension("gz")
-        let compressedData = try (data as NSData).compressed(using: .zlib) as Data
+        let compressedData = try compressZlib(data)
         try atomicWrite(compressedData, to: gzipURL)
         print("Wrote \(gzipURL.path)")
 
         print("Done.")
+    }
+
+    private func compressZlib(_ data: Data) throws -> Data {
+        #if canImport(Compression)
+            return try (data as NSData).compressed(using: .zlib) as Data
+        #else
+            let tempInput = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+            let tempOutput = tempInput.appendingPathExtension("zlib")
+            try data.write(to: tempInput)
+            defer {
+                try? FileManager.default.removeItem(at: tempInput)
+                try? FileManager.default.removeItem(at: tempOutput)
+            }
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["bash", "-c", "python3 -c \"import zlib,sys; sys.stdout.buffer.write(zlib.compress(sys.stdin.buffer.read()))\" < \(tempInput.path) > \(tempOutput.path)"]
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else {
+                throw PopcornEPGError.compressionFailed
+            }
+
+            return try Data(contentsOf: tempOutput)
+        #endif
     }
 
     private func atomicWrite(_ data: Data, to url: URL) throws {
@@ -96,4 +130,8 @@ struct PopcornEPG: AsyncParsableCommand {
         }
     }
 
+}
+
+enum PopcornEPGError: Error {
+    case compressionFailed
 }
