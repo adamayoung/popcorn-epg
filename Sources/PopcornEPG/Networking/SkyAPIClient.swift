@@ -7,6 +7,10 @@
 
 import Foundation
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 struct SkyAPIClient {
 
     private static let baseURL = "https://awk.epgsky.com/hawk/linear"
