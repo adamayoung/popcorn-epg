@@ -4,14 +4,14 @@
 import PackageDescription
 
 let package = Package(
-
     name: "PopcornEPG",
 
     platforms: [.macOS(.v13)],
 
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
-        .package(url: "https://github.com/adamayoung/TMDb.git", from: "17.0.0")
+        .package(url: "https://github.com/adamayoung/TMDb.git", from: "18.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0")
     ],
 
     targets: [
@@ -19,9 +19,9 @@ let package = Package(
             name: "PopcornEPG",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "TMDb", package: "TMDb")
+                .product(name: "TMDb", package: "TMDb"),
+                .product(name: "Crypto", package: "swift-crypto")
             ]
         )
     ]
-
 )

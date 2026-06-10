@@ -35,16 +35,35 @@ struct PopcornEPG: AsyncParsableCommand {
     @Option(name: .long, help: "Path to TMDb cache file.")
     var cache: String = "./tmdb-cache.json"
 
+    @Option(
+        name: .long,
+        help: "Comma-separated channel numbers to fetch (e.g. 101,106,301). Omit to fetch all channels."
+    )
+    var channels: String?
+
+    @Option(
+        name: .long,
+        help: "Directory for partitioned site files (manifest.json, channels.json, schedules/). Omit to skip."
+    )
+    var siteDir: String?
+
     mutating func run() async throws {
         let dates = generateDates(count: days)
         let epgService = EPGService()
 
         print("Fetching channels from all bouquets...")
-        let channels = await epgService.fetchAllChannels()
-        print("Found \(channels.count) unique channels (excluding adult).")
+        let allChannels = await epgService.fetchAllChannels()
+        print("Found \(allChannels.count) unique channels (excluding adult).")
+
+        let requestedNumbers = parseChannelNumbers(channels)
+        let selectedChannels = filterChannels(allChannels, byNumbers: requestedNumbers)
+        if let requestedNumbers {
+            let list = requestedNumbers.sorted().joined(separator: ", ")
+            print("Filtered to \(selectedChannels.count) channel(s) matching: \(list).")
+        }
 
         print("Fetching schedules for \(days) day(s)...")
-        var epgData = await epgService.fetchSchedules(for: channels, dates: dates)
+        var epgData = await epgService.fetchSchedules(for: selectedChannels, dates: dates)
 
         if let tmdbApiKey {
             let cacheURL = URL(fileURLWithPath: cache)
@@ -79,6 +98,13 @@ struct PopcornEPG: AsyncParsableCommand {
         try atomicWrite(compressedData, to: gzipURL)
         print("Wrote \(gzipURL.path)")
 
+        if let siteDir {
+            let siteURL = URL(fileURLWithPath: siteDir)
+            try fileManager.createDirectory(at: siteURL, withIntermediateDirectories: true)
+            try SiteWriter(directory: siteURL).write(epgData)
+            print("Wrote partitioned site to \(siteURL.path) (\(epgData.dates.count) day file(s) + manifest).")
+        }
+
         print("Done.")
     }
 
@@ -96,7 +122,11 @@ struct PopcornEPG: AsyncParsableCommand {
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["bash", "-c", "python3 -c \"import zlib,sys; sys.stdout.buffer.write(zlib.compress(sys.stdin.buffer.read()))\" < \(tempInput.path) > \(tempOutput.path)"]
+            process.arguments = [
+                "bash",
+                "-c",
+                "python3 -c \"import zlib,sys; sys.stdout.buffer.write(zlib.compress(sys.stdin.buffer.read()))\" < \(tempInput.path) > \(tempOutput.path)"
+            ]
             try process.run()
             process.waitUntilExit()
 
@@ -114,6 +144,33 @@ struct PopcornEPG: AsyncParsableCommand {
         try data.write(to: tempURL)
         try? fileManager.removeItem(at: url)
         try fileManager.moveItem(at: tempURL, to: url)
+    }
+
+    /// Parses the `--channels` value into a set of channel numbers, or `nil`
+    /// when the option is absent/empty (meaning "all channels").
+    private func parseChannelNumbers(_ value: String?) -> Set<String>? {
+        guard let value else {
+            return nil
+        }
+
+        let numbers = value
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        return numbers.isEmpty ? nil : Set(numbers)
+    }
+
+    /// Keeps only channels exposing one of the requested channel numbers.
+    /// Returns all channels when no filter is supplied.
+    private func filterChannels(_ channels: [Channel], byNumbers numbers: Set<String>?) -> [Channel] {
+        guard let numbers else {
+            return channels
+        }
+
+        return channels.filter { channel in
+            channel.channelNumbers.contains { numbers.contains($0.channelNumber) }
+        }
     }
 
     private func generateDates(count: Int) -> [String] {

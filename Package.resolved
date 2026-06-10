@@ -1,5 +1,5 @@
 {
-  "originHash" : "795c5a9361a940a508f7e8210e6372a10ee0e5c44bd301d0cb9f97682ad0909a",
+  "originHash" : "e88c7fb9808752ec4b40576fa787303850e5eaa5a27cea37462266b5f7e8b42e",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -11,12 +11,30 @@
       }
     },
     {
+      "identity" : "swift-asn1",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-asn1.git",
+      "state" : {
+        "revision" : "a9a5efd40eaf558a2bcd48d64b1d1646be686008",
+        "version" : "1.7.1"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "1b6b2e274e85105bfa155183145a1dcfd63331f1",
+        "version" : "4.5.0"
+      }
+    },
+    {
       "identity" : "tmdb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adamayoung/TMDb.git",
       "state" : {
-        "revision" : "6d8185a898fd4817e7a85f5981c422e15c457d8e",
-        "version" : "17.0.0"
+        "revision" : "930a9ce13f6be02940cf87a8db34dc4180b5cee8",
+        "version" : "18.0.0"
       }
     }
   ],

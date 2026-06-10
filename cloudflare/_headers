@@ -1,0 +1,14 @@
+# Cloudflare Pages headers for the EPG site.
+# Cloudflare purges the edge cache on every deployment, so these short
+# max-ages only bound client-side staleness; ETag revalidation keeps
+# conditional requests cheap (304). Clients use manifest.json's per-file
+# hashes to skip unchanged partitions entirely.
+
+/manifest.json
+  Cache-Control: public, max-age=60, must-revalidate
+
+/channels.json
+  Cache-Control: public, max-age=300, must-revalidate
+
+/schedules/*
+  Cache-Control: public, max-age=300, must-revalidate

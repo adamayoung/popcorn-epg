@@ -15,6 +15,13 @@ make build-linux-release    # Linux release build via Docker
 swift run PopcornEPG --output ./epg.json --days 7 --tmdb-api-key <KEY> --cache ./tmdb-cache.json
 ```
 
+Options:
+
+- `--channels 101,106,301` — fetch only the given channel numbers (omit for all).
+- `--site-dir ./site` — also write partitioned files for static hosting / incremental
+  client sync: `manifest.json` (per-file SHA-256 index), `channels.json`, and
+  `schedules/<date>.json`. Clients fetch the manifest, then only the changed partitions.
+
 ## Lint & Format
 
 ```bash
@@ -45,14 +52,21 @@ make test-linux             # Run tests in Docker
 - **Entry point**: `Sources/PopcornEPG/PopcornEPG.swift` — `@main` async command using ArgumentParser
 - **Models**: `Channel`, `Programme`, `Bouquet`, `EPGData`
 - **Networking**: `SkyAPIClient` with retry/backoff, `AsyncSemaphore` limiting to 20 concurrent requests
-- **Services**: `EPGService` (orchestration), `TMDbLookupService` (metadata enrichment), `TMDbCache` (JSON cache)
+- **Services**: `EPGService` (orchestration), `TMDbLookupService` (metadata enrichment), `TMDbCache` (JSON cache), `SiteWriter` (partitioned static-site output)
 - **DTOs**: `SkyServicesResponse`, `SkyScheduleResponse`
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/update-epg.yml`) runs every 12 hours, builds in `swift:6.2.0-jammy`, fetches EPG data, and auto-commits `epg.json`, `epg.json.gz`, and `tmdb-cache.json`.
+GitHub Actions (`.github/workflows/update-epg.yml`) runs every 12 hours:
+
+1. `update` job — builds in `swift:6.2.0-jammy`, fetches EPG data with `--site-dir ./site`,
+   auto-commits `epg.json`, `epg.json.gz`, and `tmdb-cache.json`, and uploads `site/` (plus
+   `cloudflare/_headers`) as an artifact.
+2. `deploy-pages` job — downloads the artifact and deploys it to Cloudflare Pages via
+   `wrangler`. No-op until `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets are set.
 
 ## Dependencies
 
 - `swift-argument-parser` (1.2.0+) — CLI argument parsing
-- `TMDb` (17.0.0+) — The Movie Database API client (`github.com/adamayoung/TMDb`)
+- `TMDb` (18.0.0+) — The Movie Database API client (`github.com/adamayoung/TMDb`)
+- `swift-crypto` (4.0.0+) — SHA-256 hashes for the partitioned manifest

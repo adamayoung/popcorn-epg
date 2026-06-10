@@ -31,9 +31,19 @@ jobs:
         run: swift build -c release -Xswiftc -warnings-as-errors
 
       - name: Run EPG fetcher
-        run: swift run -c release PopcornEPG --tmdb-api-key "$TMDB_API_KEY"
+        run: swift run -c release PopcornEPG --tmdb-api-key "$TMDB_API_KEY" --site-dir ./site
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+
+      - name: Add Cloudflare Pages config to site
+        run: cp cloudflare/_headers site/_headers
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+          retention-days: 1
 
       - name: Get current date
         run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
@@ -45,3 +55,24 @@ jobs:
           git add epg.json epg.json.gz tmdb-cache.json
           git diff-index --quiet HEAD || git commit -m "Updated EPG listings on $RUN_DATE"
           git push
+
+  deploy-pages:
+    needs: update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+
+      - name: Deploy to Cloudflare Pages
+        # No-op until CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are set.
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        uses: cloudflare/wrangler-action@v3
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy site --project-name=popcorn-epg

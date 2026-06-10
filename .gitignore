@@ -11,6 +11,9 @@ info.lcov
 default.profraw
 junit-swift-testing.xml
 
+# Wrangler (Cloudflare) local state
+.wrangler/
+
 # Claude
 .claude/settings.local.json
 

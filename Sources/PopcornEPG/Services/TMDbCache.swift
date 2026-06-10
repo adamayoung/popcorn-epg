@@ -13,6 +13,15 @@ struct TMDbCacheEntry: Codable {
     let tmdbTVSeriesID: Int?
     let cachedAt: Date
 
+    // Enriched detail fields. Optional so they're simply omitted when a title
+    // doesn't resolve or a particular field is unavailable.
+    var genres: [String]?
+    var certification: String?
+    var voteAverage: Double?
+    var voteCount: Int?
+    var keywords: [String]?
+    var watchProviders: [String]?
+
     var hasResult: Bool {
         tmdbMovieID != nil || tmdbTVSeriesID != nil
     }

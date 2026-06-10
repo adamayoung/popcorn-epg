@@ -19,6 +19,12 @@ struct Programme: Encodable {
     let imageURL: String?
     var tmdbMovieID: Int?
     var tmdbTVSeriesID: Int?
+    var genres: [String]?
+    var certification: String?
+    var voteAverage: Double?
+    var voteCount: Int?
+    var keywords: [String]?
+    var watchProviders: [String]?
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -34,12 +40,20 @@ struct Programme: Encodable {
         try container.encodeIfPresent(imageURL, forKey: .imageURL)
         try container.encodeIfPresent(tmdbMovieID, forKey: .tmdbMovieID)
         try container.encodeIfPresent(tmdbTVSeriesID, forKey: .tmdbTVSeriesID)
+        try container.encodeIfPresent(genres, forKey: .genres)
+        try container.encodeIfPresent(certification, forKey: .certification)
+        try container.encodeIfPresent(voteAverage, forKey: .voteAverage)
+        try container.encodeIfPresent(voteCount, forKey: .voteCount)
+        try container.encodeIfPresent(keywords, forKey: .keywords)
+        try container.encodeIfPresent(watchProviders, forKey: .watchProviders)
     }
 
     private enum CodingKeys: String, CodingKey {
         case title, description, startTime, duration
         case seasonNumber, episodeNumber, isPremiere
         case imageURL, tmdbMovieID, tmdbTVSeriesID
+        case genres, certification, voteAverage, voteCount
+        case keywords, watchProviders
     }
 
 }
