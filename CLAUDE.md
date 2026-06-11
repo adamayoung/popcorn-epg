@@ -68,5 +68,5 @@ GitHub Actions (`.github/workflows/update-epg.yml`) runs every 12 hours:
 ## Dependencies
 
 - `swift-argument-parser` (1.2.0+) — CLI argument parsing
-- `TMDb` (18.0.0+) — The Movie Database API client (`github.com/adamayoung/TMDb`)
+- `TMDb` (18.0.1+) — The Movie Database API client (`github.com/adamayoung/TMDb`)
 - `swift-crypto` (4.0.0+) — SHA-256 hashes for the partitioned manifest
