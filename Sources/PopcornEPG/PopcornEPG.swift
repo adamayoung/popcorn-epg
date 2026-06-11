@@ -23,8 +23,8 @@ struct PopcornEPG: AsyncParsableCommand {
         abstract: "Fetches Sky EPG data and outputs JSON files per day."
     )
 
-    @Option(name: .long, help: "Output JSON file path.")
-    var output: String = "./epg.json"
+    @Option(name: .long, help: "Single-file JSON output path (also writes a .gz). Omit to skip single-file output.")
+    var output: String?
 
     @Option(name: .long, help: "Number of days to fetch (today + N-1 days).")
     var days: Int = 7
@@ -79,27 +79,30 @@ struct PopcornEPG: AsyncParsableCommand {
             print("Saved TMDb cache (\(newCacheCount) entries).")
         }
 
-        let outputURL = URL(fileURLWithPath: output)
-        let outputDir = outputURL.deletingLastPathComponent()
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: outputDir.path) {
-            try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        if let output {
+            let outputURL = URL(fileURLWithPath: output)
+            let outputDir = outputURL.deletingLastPathComponent()
+            let fileManager = FileManager.default
+            if !fileManager.fileExists(atPath: outputDir.path) {
+                try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
+            }
+
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+
+            let data = try encoder.encode(epgData)
+            try atomicWrite(data, to: outputURL)
+            print("Wrote \(outputURL.path) (\(epgData.channels.count) channels, \(epgData.dates.count) days)")
+
+            let gzipURL = outputURL.appendingPathExtension("gz")
+            let compressedData = try compressZlib(data)
+            try atomicWrite(compressedData, to: gzipURL)
+            print("Wrote \(gzipURL.path)")
         }
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-
-        let data = try encoder.encode(epgData)
-        try atomicWrite(data, to: outputURL)
-        print("Wrote \(outputURL.path) (\(epgData.channels.count) channels, \(epgData.dates.count) days)")
-
-        let gzipURL = outputURL.appendingPathExtension("gz")
-        let compressedData = try compressZlib(data)
-        try atomicWrite(compressedData, to: gzipURL)
-        print("Wrote \(gzipURL.path)")
 
         if let siteDir {
             let siteURL = URL(fileURLWithPath: siteDir)
+            let fileManager = FileManager.default
             try fileManager.createDirectory(at: siteURL, withIntermediateDirectories: true)
             try SiteWriter(directory: siteURL).write(epgData)
             print("Wrote partitioned site to \(siteURL.path) (\(epgData.dates.count) day file(s) + manifest).")

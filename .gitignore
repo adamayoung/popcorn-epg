@@ -11,6 +11,10 @@ info.lcov
 default.profraw
 junit-swift-testing.xml
 
+# Single-file EPG output (opt-in via --output; not committed)
+/epg.json
+/epg.json.gz
+
 # Wrangler (Cloudflare) local state
 .wrangler/
 

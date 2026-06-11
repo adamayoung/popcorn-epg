@@ -131,16 +131,6 @@ Programmes reference channels by `sid`.
 - `certification` is the **GB/BBFC** rating; `watchProviders` are **GB** streaming
   services (via JustWatch/TMDb).
 
-## Legacy single-file feed
-
-A single monolithic snapshot is also committed to the repository for backward
-compatibility, but it is large (~37 MB) and not recommended for incremental clients:
-
-- `https://raw.githubusercontent.com/adamayoung/popcorn-epg/main/epg.json`
-- `https://raw.githubusercontent.com/adamayoung/popcorn-epg/main/epg.json.gz` (gzip)
-
-New clients should use the partitioned files above.
-
 ## Development
 
 ```bash
@@ -156,7 +146,6 @@ Run locally (writes the partitioned site to `./site`):
 swift run PopcornEPG \
   --days 7 \
   --tmdb-api-key <KEY> \
-  --output ./epg.json \
   --cache ./tmdb-cache.json \
   --site-dir ./site
 ```
@@ -168,7 +157,7 @@ swift run PopcornEPG \
 | `--cache <path>` | TMDb lookup cache file. Default `./tmdb-cache.json`. |
 | `--channels <list>` | Comma-separated channel numbers to fetch, e.g. `101,106,301`. Omit for all. |
 | `--site-dir <path>` | Also write the partitioned `manifest.json` / `channels.json` / `schedules/` files. |
-| `--output <path>` | Single-file JSON output. Default `./epg.json`. |
+| `--output <path>` | Opt-in single-file JSON output (also writes a `.gz`). Omitted by default; not committed. |
 
 See [`CLAUDE.md`](CLAUDE.md) for architecture and contributor notes.
 
