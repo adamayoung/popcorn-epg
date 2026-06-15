@@ -106,7 +106,9 @@ Source tree (`Sources/PopcornEPG/`):
     The manifest carries `generatedAt` so it is not itself hashed.
 - `DTOs/`
   - `SkyServicesResponse.swift` — `services: [Service]`; `Service { sid, c (channel number), t (title),
-    sf (hd/sd), sg (genre; 18 = adult) }` with `isAdult`/`isHD` helpers.
+    sf, sg (genre; 18 = adult) }` with `isAdult`/`isHD` helpers. Note `sf` is **uppercase**
+    (`"HD"`/`"SD"`) in the API, so `isHD` must compare case-insensitively (the lowercase `== "hd"`
+    check made every channel `isHD: false`).
   - `SkyScheduleResponse.swift` — schedule events.
 
 ### Sky bouquet / subbouquet → region mapping

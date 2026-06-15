@@ -18,6 +18,7 @@ the parts that changed.
 | --- | --- |
 | [`/manifest.json`](https://epg.adam-young.co.uk/manifest.json) | Index of every file with a content hash + size. Fetch this first. |
 | [`/channels.json`](https://epg.adam-young.co.uk/channels.json) | The channel directory (metadata only, no schedules). |
+| [`/regions.json`](https://epg.adam-young.co.uk/regions.json) | Static lookup of Sky regions, keyed by `(bouquet, subBouquet)`. Rarely changes. |
 | `/schedules/<date>.json` | One file per day, e.g. `/schedules/20260611.json`. |
 
 ### How to sync (recommended)
@@ -60,6 +61,7 @@ curl -s https://epg.adam-young.co.uk/schedules/20260611.json
   "dates": ["20260611", "20260612", ...], // the days currently published
   "files": [
     { "path": "channels.json",            "hash": "<sha256>", "bytes": 18234 },
+    { "path": "regions.json",             "hash": "<sha256>", "bytes": 4096 },
     { "path": "schedules/20260611.json",  "hash": "<sha256>", "bytes": 241003 }
   ]
 }
@@ -79,7 +81,13 @@ fetch it first to discover what changed.
       "logoURL": "https://epgstatic.sky.com/epgdata/1.0/newchanlogos/600/600/skychb1412.png",
       "isHD": false,
       "channelNumbers": [
-        { "channelNumber": "108", "subbouquetIDs": [1, 2, 3, ...] }
+        {
+          "channelNumber": "108",
+          "regions": [
+            { "bouquet": 4101, "subBouquet": 1 },
+            { "bouquet": 4097, "subBouquet": 1 }
+          ]
+        }
       ]
     }
   ]
@@ -87,6 +95,36 @@ fetch it first to discover what changed.
 ```
 
 Programmes reference channels by `sid`.
+
+A channel can carry a **different number in different regions**, so `channelNumbers`
+lists each number alongside the `(bouquet, subBouquet)` regions where it applies. Join
+those pairs to [`regions.json`](#regionsjson) to label or filter the guide by region.
+
+### `regions.json`
+
+```jsonc
+{
+  "regions": [
+    {
+      "bouquet": 4101,                       // nation-group + resolution
+      "subBouquet": 1,                       // area within the bouquet
+      "name": "London",
+      "nation": "England",
+      "isHD": true
+    },
+    { "bouquet": 4097, "subBouquet": 1, "name": "London", "nation": "England", "isHD": false }
+  ]
+}
+```
+
+A Sky region is identified by the **`(bouquet, subBouquet)` pair** — the bouquet encodes
+the nation-group and resolution, the subBouquet the area within it. The same area keeps
+the same `subBouquet` across its HD and SD bouquets, so each area appears twice (once per
+resolution). This file is static and only changes when the region table is updated.
+
+> Note: the fetcher currently probes a subset of bouquets/subBouquets, so a given
+> channel's `regions` only contains the pairs actually fetched (and bouquets outside the
+> region table won't resolve to a name). `regions.json` always lists the full table.
 
 ### `schedules/<date>.json`
 
@@ -156,8 +194,8 @@ swift run PopcornEPG \
 | `--tmdb-api-key <key>` | TMDb API key for metadata enrichment (optional). |
 | `--cache <path>` | TMDb lookup cache file. Default `./tmdb-cache.json`. |
 | `--channels <list>` | Comma-separated channel numbers to fetch, e.g. `101,106,301`. Omit for all. |
-| `--site-dir <path>` | Also write the partitioned `manifest.json` / `channels.json` / `schedules/` files. |
-| `--output <path>` | Opt-in single-file JSON output (also writes a `.gz`). Omitted by default; not committed. |
+| `--site-dir <path>` | Also write the partitioned `manifest.json` / `channels.json` / `regions.json` / `schedules/` files. |
+| `--output <path>` | Opt-in single-file JSON output (also writes a `.gz` and `regions.json`). Omitted by default; not committed. |
 
 See [`CLAUDE.md`](CLAUDE.md) for architecture and contributor notes.
 
