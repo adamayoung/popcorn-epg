@@ -43,6 +43,11 @@ struct SiteWriter {
         let channelsFile = ChannelsFile(channels: channels.map(ChannelInfo.init))
         try entries.append(writeFile(channelsFile, to: "channels.json", using: encoder))
 
+        // Static region lookup, so clients can resolve a channel's (bouquet,
+        // subBouquet) pairs to region names and filter the guide by region.
+        let regionsFile = RegionsFile(regions: Region.all)
+        try entries.append(writeFile(regionsFile, to: "regions.json", using: encoder))
+
         for date in epgData.dates.sorted() {
             let dayChannels = channels.compactMap { channel -> DayChannel? in
                 guard let schedule = channel.schedules.first(where: { $0.date == date }),

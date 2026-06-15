@@ -36,9 +36,9 @@ struct EPGService {
 
 extension EPGService {
 
-    private func fetchAllServices() async -> [(service: SkyServicesResponse.Service, subbouquetID: Int)] {
+    private func fetchAllServices() async -> [(service: SkyServicesResponse.Service, region: RegionRef)] {
         await withTaskGroup(
-            of: [(service: SkyServicesResponse.Service, subbouquetID: Int)].self
+            of: [(service: SkyServicesResponse.Service, region: RegionRef)].self
         ) { group in
             for bouquet in Bouquet.all {
                 for subbouquetID in 1 ... Self.maxSubbouquetID {
@@ -47,7 +47,8 @@ extension EPGService {
                             let response = try await apiClient.fetchServices(
                                 bouquetID: bouquet.id, subbouquetID: subbouquetID
                             )
-                            return response.services.map { (service: $0, subbouquetID: subbouquetID) }
+                            let region = RegionRef(bouquet: bouquet.id, subBouquet: subbouquetID)
+                            return response.services.map { (service: $0, region: region) }
                         } catch {
                             return []
                         }
@@ -55,7 +56,7 @@ extension EPGService {
                 }
             }
 
-            var results: [(service: SkyServicesResponse.Service, subbouquetID: Int)] = []
+            var results: [(service: SkyServicesResponse.Service, region: RegionRef)] = []
             for await batch in group {
                 results.append(contentsOf: batch)
             }
@@ -65,33 +66,33 @@ extension EPGService {
     }
 
     private func buildChannels(
-        from allServices: [(service: SkyServicesResponse.Service, subbouquetID: Int)]
+        from allServices: [(service: SkyServicesResponse.Service, region: RegionRef)]
     ) -> [Channel] {
-        var channelsBySID: [String: (service: SkyServicesResponse.Service, numbersBySub: [Int: String])] = [:]
+        var channelsBySID: [String: (service: SkyServicesResponse.Service, numbersByRegion: [RegionRef: String])] = [:]
 
-        for (service, subbouquetID) in allServices {
+        for (service, region) in allServices {
             guard !service.isAdult else {
                 continue
             }
 
             if var existing = channelsBySID[service.sid] {
-                existing.numbersBySub[subbouquetID] = service.c
+                existing.numbersByRegion[region] = service.c
                 channelsBySID[service.sid] = existing
             } else {
-                channelsBySID[service.sid] = (service: service, numbersBySub: [subbouquetID: service.c])
+                channelsBySID[service.sid] = (service: service, numbersByRegion: [region: service.c])
             }
         }
 
-        return channelsBySID.values.map { service, numbersBySub in
-            var grouped: [String: [Int]] = [:]
-            for (subbouquetID, channelNumber) in numbersBySub {
-                grouped[channelNumber, default: []].append(subbouquetID)
+        return channelsBySID.values.map { service, numbersByRegion in
+            var grouped: [String: [RegionRef]] = [:]
+            for (region, channelNumber) in numbersByRegion {
+                grouped[channelNumber, default: []].append(region)
             }
 
-            let channelNumbers = grouped.map { channelNumber, subbouquetIDs in
+            let channelNumbers = grouped.map { channelNumber, regions in
                 ChannelNumberMapping(
                     channelNumber: channelNumber,
-                    subbouquetIDs: subbouquetIDs.sorted()
+                    regions: regions.sorted { ($0.bouquet, $0.subBouquet) < ($1.bouquet, $1.subBouquet) }
                 )
             }.sorted { $0.channelNumber < $1.channelNumber }
 

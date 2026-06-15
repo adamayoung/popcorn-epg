@@ -80,24 +80,7 @@ struct PopcornEPG: AsyncParsableCommand {
         }
 
         if let output {
-            let outputURL = URL(fileURLWithPath: output)
-            let outputDir = outputURL.deletingLastPathComponent()
-            let fileManager = FileManager.default
-            if !fileManager.fileExists(atPath: outputDir.path) {
-                try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
-            }
-
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-
-            let data = try encoder.encode(epgData)
-            try atomicWrite(data, to: outputURL)
-            print("Wrote \(outputURL.path) (\(epgData.channels.count) channels, \(epgData.dates.count) days)")
-
-            let gzipURL = outputURL.appendingPathExtension("gz")
-            let compressedData = try compressZlib(data)
-            try atomicWrite(compressedData, to: gzipURL)
-            print("Wrote \(gzipURL.path)")
+            try writeSingleFile(epgData, to: output)
         }
 
         if let siteDir {
@@ -109,6 +92,36 @@ struct PopcornEPG: AsyncParsableCommand {
         }
 
         print("Done.")
+    }
+
+    /// Writes the single-file JSON guide (`epg.json`), its zlib `.gz`, and the
+    /// static `regions.json` lookup, all into the directory of `output`.
+    private func writeSingleFile(_ epgData: EPGData, to output: String) throws {
+        let outputURL = URL(fileURLWithPath: output)
+        let outputDir = outputURL.deletingLastPathComponent()
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: outputDir.path) {
+            try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        let data = try encoder.encode(epgData)
+        try atomicWrite(data, to: outputURL)
+        print("Wrote \(outputURL.path) (\(epgData.channels.count) channels, \(epgData.dates.count) days)")
+
+        let gzipURL = outputURL.appendingPathExtension("gz")
+        let compressedData = try compressZlib(data)
+        try atomicWrite(compressedData, to: gzipURL)
+        print("Wrote \(gzipURL.path)")
+
+        // Static region lookup alongside the guide, for clients that resolve a
+        // channel's (bouquet, subBouquet) pairs to region names.
+        let regionsURL = outputDir.appendingPathComponent("regions.json")
+        let regionsData = try encoder.encode(RegionsFile(regions: Region.all))
+        try atomicWrite(regionsData, to: regionsURL)
+        print("Wrote \(regionsURL.path) (\(Region.all.count) regions)")
     }
 
     private func compressZlib(_ data: Data) throws -> Data {
