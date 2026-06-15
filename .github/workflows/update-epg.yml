@@ -39,7 +39,7 @@ jobs:
         run: cp cloudflare/_headers site/_headers
 
       - name: Upload site artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: site
           path: site
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download site artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: site
           path: site
@@ -83,7 +83,7 @@ jobs:
       - name: Deploy to Cloudflare Pages
         # No-op until CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are set.
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         with:
