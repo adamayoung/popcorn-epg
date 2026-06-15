@@ -23,7 +23,7 @@ struct SkyServicesResponse: Decodable {
         }
 
         var isHD: Bool {
-            sf == "hd"
+            sf.caseInsensitiveCompare("hd") == .orderedSame
         }
     }
 
