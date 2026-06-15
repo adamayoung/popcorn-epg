@@ -22,6 +22,10 @@ struct SkyServicesResponse: Decodable {
             sg == 18
         }
 
+        var isRadio: Bool {
+            sg == 4
+        }
+
         var isHD: Bool {
             sf.caseInsensitiveCompare("hd") == .orderedSame
         }

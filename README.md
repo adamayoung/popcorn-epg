@@ -80,6 +80,7 @@ fetch it first to discover what changed.
       "name": "Sky Atlantic",
       "logoURL": "https://epgstatic.sky.com/epgdata/1.0/newchanlogos/600/600/skychb1412.png",
       "isHD": false,
+      "type": "tv",                          // "tv" or "radio"
       "channelNumbers": [
         {
           "channelNumber": "108",
@@ -95,6 +96,13 @@ fetch it first to discover what changed.
 ```
 
 Programmes reference channels by `sid`.
+
+`type` is `"tv"` or `"radio"` (derived from the Sky service genre, not the number).
+
+> **Treat `channelNumber` as an opaque string — never parse it to an integer.**
+> Radio stations occupy a zero-padded band (`"0101"`–`"0141"`) that overlaps the TV
+> numbers (`"101"`–`"141"`) once coerced to `Int`: e.g. `"101"` is BBC One but `"0101"`
+> is BBC Radio 1. The leading zero is significant. Use `type` to split TV from radio.
 
 A channel can carry a **different number in different regions**, so `channelNumbers`
 lists each number alongside the `(bouquet, subBouquet)` regions where it applies. Join

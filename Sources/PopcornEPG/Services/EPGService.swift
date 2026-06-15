@@ -101,6 +101,7 @@ extension EPGService {
                 name: service.t,
                 logoURL: "https://epgstatic.sky.com/epgdata/1.0/newchanlogos/600/600/skychb\(service.sid).png",
                 isHD: service.isHD,
+                type: service.isRadio ? .radio : .tv,
                 channelNumbers: channelNumbers,
                 schedules: []
             )

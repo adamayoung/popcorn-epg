@@ -74,9 +74,12 @@ Source tree (`Sources/PopcornEPG/`):
   `atomicWrite` (write `.tmp`, remove, move). zlib via `Compression` on Apple, python3
   fallback on Linux. JSON encoded with `.sortedKeys`.
 - `Models/`
-  - `Channel.swift` — `Channel` (sid, name, logoURL, isHD, `channelNumbers: [ChannelNumberMapping]`,
-    `schedules: [DaySchedule]`), `ChannelNumberMapping` (channelNumber, `regions: [RegionRef]`),
+  - `Channel.swift` — `Channel` (sid, name, logoURL, isHD, `type: ChannelType`,
+    `channelNumbers: [ChannelNumberMapping]`, `schedules: [DaySchedule]`), `ChannelType`
+    (`tv`/`radio` string enum), `ChannelNumberMapping` (channelNumber, `regions: [RegionRef]`),
     `RegionRef` (`bouquet`, `subBouquet`; `Hashable`), `DaySchedule` (date, programmes). All `Encodable`.
+    Note `channelNumber` is a **string** and must stay one — radio uses a zero-padded band
+    (`"0101"`–`"0141"`) that collides with TV (`"101"`–`"141"`) if parsed as `Int`.
   - `Region.swift` — `Region` (bouquet, subBouquet, name, nation, isHD) + `RegionsFile` wrapper
     (`{ regions: [Region] }`) for `regions.json`. `Region+all.swift` holds the static
     (bouquet, subBouquet) → region table (one entry per HD and SD pair; see mapping below).
@@ -106,9 +109,10 @@ Source tree (`Sources/PopcornEPG/`):
     The manifest carries `generatedAt` so it is not itself hashed.
 - `DTOs/`
   - `SkyServicesResponse.swift` — `services: [Service]`; `Service { sid, c (channel number), t (title),
-    sf, sg (genre; 18 = adult) }` with `isAdult`/`isHD` helpers. Note `sf` is **uppercase**
-    (`"HD"`/`"SD"`) in the API, so `isHD` must compare case-insensitively (the lowercase `== "hd"`
-    check made every channel `isHD: false`).
+    sf, sg (genre), xsg }` with `isAdult` (`sg == 18`), `isRadio` (`sg == 4`), and `isHD` helpers.
+    Note `sf` is **uppercase** (`"HD"`/`"SD"`) in the API, so `isHD` must compare case-insensitively
+    (the lowercase `== "hd"` check made every channel `isHD: false`). `sg` genres: 3 = TV,
+    4 = radio, 5 = news, 6 = movies, 7 = sport, 18 = adult.
   - `SkyScheduleResponse.swift` — schedule events.
 
 ### Sky bouquet / subbouquet → region mapping

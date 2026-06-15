@@ -123,6 +123,7 @@ private struct ChannelInfo: Encodable {
     let name: String
     let logoURL: String
     let isHD: Bool
+    let type: ChannelType
     let channelNumbers: [ChannelNumberMapping]
 
     init(_ channel: Channel) {
@@ -130,6 +131,7 @@ private struct ChannelInfo: Encodable {
         self.name = channel.name
         self.logoURL = channel.logoURL
         self.isHD = channel.isHD
+        self.type = channel.type
         self.channelNumbers = channel.channelNumbers
     }
 }
