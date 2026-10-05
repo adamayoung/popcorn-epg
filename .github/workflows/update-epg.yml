@@ -11,32 +11,42 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    container: swift:6.2.0-jammy
+    env:
+      SWIFT_IMAGE: swift:6.2.0-jammy
+      BINARY_DIR: /home/runner/.cache/popcorn-epg
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
 
-      - name: Fix git ownership
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      # The cache key includes the Swift sources so any code change misses the
-      # cache and forces a clean build. Caching .build across source changes
-      # corrupts SwiftPM's incremental build (restored object-file mtimes make it
-      # skip changed files), so there is deliberately no restore-keys fallback —
-      # a partial restore would reintroduce the same stale build.
-      - name: Cache Swift packages
+      # Only the built binary is cached. The key covers everything that affects
+      # it (sources, package manifests and this workflow, which holds the image
+      # and build flags), so it is rebuilt exactly when one of those changes.
+      # There is deliberately no restore-keys fallback: a binary from different
+      # sources must never be run.
+      - name: Cache EPG fetcher binary
+        id: binary-cache
         uses: actions/cache@v5
         with:
-          path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved', 'Package.swift', 'Sources/**/*.swift') }}
+          path: ${{ env.BINARY_DIR }}
+          key: ${{ runner.os }}-${{ runner.arch }}-popcorn-epg-${{ hashFiles('Package.resolved', 'Package.swift', 'Sources/**/*.swift', '.github/workflows/update-epg.yml') }}
 
+      # The Swift standard library and Foundation are linked statically so the
+      # binary runs directly on the runner, which lets cache hits skip pulling
+      # the Swift image altogether.
       - name: Build
-        run: swift build -c release -Xswiftc -warnings-as-errors
+        if: steps.binary-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$BINARY_DIR"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE":/workspace:ro \
+            -v "$BINARY_DIR":/out \
+            -w /workspace \
+            "$SWIFT_IMAGE" \
+            bash -c 'swift build -c release -Xswiftc -warnings-as-errors --static-swift-stdlib --scratch-path /tmp/build && cp /tmp/build/release/PopcornEPG /out/PopcornEPG'
 
-      # Run the binary from the Build step directly: `swift run` without the same
-      # -Xswiftc flags recompiles the module first.
       - name: Run EPG fetcher
-        run: .build/release/PopcornEPG --tmdb-api-key "$TMDB_API_KEY" --site-dir ./site
+        run: |
+          "$BINARY_DIR/PopcornEPG" --tmdb-api-key "$TMDB_API_KEY" --site-dir ./site
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
 
@@ -51,7 +61,7 @@ jobs:
           retention-days: 1
 
       - name: Get current date
-        run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        run: echo "RUN_DATE=$(date +'%Y-%m-%d')" >> "$GITHUB_ENV"
 
       - name: Commit and push
         run: |

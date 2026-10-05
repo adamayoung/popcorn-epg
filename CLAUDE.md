@@ -162,7 +162,10 @@ Observed on 2026-10-05; none of this is documented by Sky.
 
 GitHub Actions (`.github/workflows/update-epg.yml`) runs every 12 hours:
 
-1. `update` job — builds in `swift:6.2.0-jammy`, fetches EPG data with `--site-dir ./site`,
+1. `update` job — runs on the plain runner. The fetcher binary is cached (`actions/cache`) keyed on the
+   sources, package manifests and the workflow file; on a miss it is built inside `swift:6.2.0-jammy`
+   via `docker run` with `--static-swift-stdlib`, so cache hits need neither the Swift image nor a
+   build. It then fetches EPG data with `--site-dir ./site`,
    auto-commits `tmdb-cache.json`, and uploads `site/` (plus `cloudflare/_headers`) as an artifact.
    The single-file `epg.json` / `epg.json.gz` output is not produced or committed by CI.
 2. `deploy-pages` job — downloads the artifact and deploys it to Cloudflare Pages via
