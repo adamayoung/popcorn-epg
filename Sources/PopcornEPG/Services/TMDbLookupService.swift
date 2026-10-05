@@ -164,81 +164,49 @@ extension TMDbLookupService {
         var watchProviders: [String]?
     }
 
-    /// Fetches movie details. Each request is independent so a failure in one
-    /// (e.g. keywords) still preserves whatever the others returned. Requests
-    /// run sequentially to stay within the per-task semaphore budget.
+    /// Fetches movie details in a single request, appending the release dates,
+    /// keywords and watch providers. A failed request leaves every detail
+    /// field empty for this title.
     private func fetchMovieDetails(_ movieID: Int, title: String) async -> TMDbDetails {
-        var details = TMDbDetails()
-
         do {
-            let movie = try await tmdbClient.movies.details(forMovie: movieID, language: nil)
-            details.genres = movie.genres?.map(\.name).nonEmptyOrNil
-            details.voteAverage = movie.voteAverage
-            details.voteCount = movie.voteCount
+            let response = try await tmdbClient.movies.details(
+                forMovie: movieID, appending: [.releaseDates, .keywords, .watchProviders], language: nil
+            )
+
+            return TMDbDetails(
+                genres: response.movie.genres?.map(\.name).nonEmptyOrNil,
+                certification: response.releaseDates.flatMap(Self.gbCertification(from:)),
+                voteAverage: response.movie.voteAverage,
+                voteCount: response.movie.voteCount,
+                keywords: response.keywords?.map(\.name).nonEmptyOrNil,
+                watchProviders: Self.gbWatchProviders(from: response.watchProviders)
+            )
         } catch {
             print("Warning: TMDb movie details failed for '\(title)': \(error)")
+            return TMDbDetails()
         }
-
-        do {
-            let releaseDates = try await tmdbClient.movies.releaseDates(forMovie: movieID)
-            details.certification = Self.gbCertification(from: releaseDates)
-        } catch {
-            print("Warning: TMDb movie release dates failed for '\(title)': \(error)")
-        }
-
-        do {
-            let keywords = try await tmdbClient.movies.keywords(forMovie: movieID)
-            details.keywords = keywords.keywords.map(\.name).nonEmptyOrNil
-        } catch {
-            print("Warning: TMDb movie keywords failed for '\(title)': \(error)")
-        }
-
-        do {
-            let providers = try await tmdbClient.movies.watchProviders(forMovie: movieID)
-            details.watchProviders = Self.gbWatchProviders(from: providers)
-        } catch {
-            print("Warning: TMDb movie watch providers failed for '\(title)': \(error)")
-        }
-
-        return details
     }
 
     /// Fetches TV series details. Mirrors `fetchMovieDetails` but uses
     /// content ratings (rather than release dates) for the GB certification.
     private func fetchTVSeriesDetails(_ tvSeriesID: Int, title: String) async -> TMDbDetails {
-        var details = TMDbDetails()
-
         do {
-            let series = try await tmdbClient.tvSeries.details(forTVSeries: tvSeriesID, language: nil)
-            details.genres = series.genres?.map(\.name).nonEmptyOrNil
-            details.voteAverage = series.voteAverage
-            details.voteCount = series.voteCount
+            let response = try await tmdbClient.tvSeries.details(
+                forTVSeries: tvSeriesID, appending: [.contentRatings, .keywords, .watchProviders], language: nil
+            )
+
+            return TMDbDetails(
+                genres: response.tvSeries.genres?.map(\.name).nonEmptyOrNil,
+                certification: response.contentRatings.flatMap(Self.gbCertification(from:)),
+                voteAverage: response.tvSeries.voteAverage,
+                voteCount: response.tvSeries.voteCount,
+                keywords: response.keywords?.map(\.name).nonEmptyOrNil,
+                watchProviders: Self.gbWatchProviders(from: response.watchProviders)
+            )
         } catch {
             print("Warning: TMDb TV details failed for '\(title)': \(error)")
+            return TMDbDetails()
         }
-
-        do {
-            let ratings = try await tmdbClient.tvSeries.contentRatings(forTVSeries: tvSeriesID)
-            details.certification = Self.gbCertification(from: ratings)
-        } catch {
-            print("Warning: TMDb TV content ratings failed for '\(title)': \(error)")
-        }
-
-        do {
-            let keywords = try await tmdbClient.tvSeries.keywords(forTVSeries: tvSeriesID)
-            details.keywords = keywords.keywords.map(\.name).nonEmptyOrNil
-        } catch {
-            print("Warning: TMDb TV keywords failed for '\(title)': \(error)")
-        }
-
-        do {
-            let providers = try await tmdbClient.tvSeries.watchProviders(forTVSeries: tvSeriesID)
-            details.watchProviders = Self.gbWatchProviders(from: providers)
-        } catch {
-            print("Warning: TMDb TV watch providers failed for '\(title)': \(error)")
-        }
-
-        return details
     }
 
 }
@@ -270,12 +238,11 @@ extension TMDbLookupService {
 
     /// GB streaming provider names — flat-rate (subscription), ad-supported, and
     /// free, in that priority order, deduplicated. Buy/rent are excluded.
-    private static func gbWatchProviders(from providers: [ShowWatchProvidersByCountry]) -> [String]? {
-        guard let gbProviders = providers.first(where: { $0.countryCode == region }) else {
+    private static func gbWatchProviders(from providersByCountry: [String: ShowWatchProvider]?) -> [String]? {
+        guard let streaming = providersByCountry?[region] else {
             return nil
         }
 
-        let streaming = gbProviders.watchProviders
         let ordered = (streaming.flatRate ?? []) + (streaming.ads ?? []) + (streaming.free ?? [])
 
         var seen: Set<String> = []
