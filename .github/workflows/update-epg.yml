@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# Overlapping runs would each rewrite the single-line tmdb-cache.json, and the
+# second one's rebase in "Commit and push" would conflict. Queue them instead.
+concurrency:
+  group: update-epg
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
