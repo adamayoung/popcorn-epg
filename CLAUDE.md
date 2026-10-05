@@ -57,7 +57,8 @@ make test-linux             # Run tests in Docker
 
 - **Entry point**: `Sources/PopcornEPG/PopcornEPG.swift` — `@main` async command using ArgumentParser
 - **Models**: `Channel`, `Programme`, `Bouquet`, `EPGData`
-- **Networking**: `SkyAPIClient` with retry/backoff, `AsyncSemaphore` limiting to 20 concurrent requests
+- **Networking**: `SkyAPIClient` with retry/backoff and its own `URLSession`; `AsyncSemaphore` limiting to 20
+  concurrent requests, with the session's per-host connection limit set to match
 - **Services**: `EPGService` (orchestration), `TMDbLookupService` (metadata enrichment), `TMDbCache` (JSON cache), `SiteWriter` (partitioned static-site output)
 - **DTOs**: `SkyServicesResponse`, `SkyScheduleResponse`
 
@@ -90,17 +91,26 @@ Source tree (`Sources/PopcornEPG/`):
   - `EPGData.swift` — `{ dates: [String]; channels: [Channel] }`, the single-file output root.
 - `Networking/`
   - `SkyAPIClient.swift` — base `https://awk.epgsky.com/hawk/linear`. `fetchServices(bouquetID:subbouquetID:)`
-    → `/services/{b}/{s}`; `fetchSchedule(date:sid:)` → `/schedule/{date}/{sid}`. 3 retries, exponential
-    backoff, retries on 429/500/502/503/504.
+    → `/services/{b}/{s}`; `fetchSchedule(date:sids:)` → `/schedule/{date}/{sid,sid,…}` (comma-separated,
+    max 20 SIDs). 3 retries, exponential backoff, retries on 429/500/502/503/504. `init(maxConnectionsPerHost:)`
+    builds a dedicated `URLSession`: the API is HTTP/1.1 only and URLSession's default of 6 connections per
+    host would otherwise cap concurrency below the semaphore limit.
   - `SkyAPIError.swift` — `invalidURL`, `httpError(statusCode:)`, `decodingError`.
 - `Services/`
   - `EPGService.swift` — orchestration. `fetchAllServices()` probes every `Bouquet.all` × subbouquet
     `1...20` (`maxSubbouquetID`) in a task group, swallowing failures, tagging each service with a
     `RegionRef(bouquet, subBouquet)`. `buildChannels()` dedupes by `service.sid`, skips adult
     (`sg == 18`), and groups channel numbers → the `RegionRef`s they appear in (bouquet + subbouquet
-    both preserved). `fetchAllSchedules()` fans out per channel/date under a 20-permit
-    `AsyncSemaphore`. `cleanDescription` strips `[AD][HD][S]…` feature tags via regex.
-  - `TMDbLookupService.swift` — enriches programmes with TMDb metadata.
+    both preserved). `fetchAllSchedules()` splits channels into batches of 20 SIDs
+    (`maxSIDsPerScheduleRequest`) and fans out one request per batch/date under a 20-permit
+    `AsyncSemaphore`, matching response entries to channels by SID. If a batch request fails, its
+    channels are fetched one at a time so a bad channel only loses itself. `init(maxConcurrentRequests:)`
+    creates the `SkyAPIClient` with the same number as its connection limit. `cleanDescription` strips
+    `[AD][HD][S]…` feature tags via regex.
+  - `TMDbLookupService.swift` — enriches programmes with TMDb metadata. Per uncached title: a search
+    (TV only for episodic titles; otherwise movies, then TV), then one details request using
+    `append_to_response` for release dates / content ratings, keywords and watch providers. A failed
+    details request leaves all detail fields empty for that title.
   - `TMDbCache.swift` — actor-backed JSON cache (disposable; safe to delete/regenerate).
   - `SiteWriter.swift` — partitioned output: `channels.json` (directory, no schedules),
     `regions.json` (static `Region.all` lookup), `schedules/<date>.json` (one per day),
@@ -129,13 +139,28 @@ but a channel's `regions` only contains the (bouquet, subBouquet) pairs actually
 Extra/Secondary/Tertiary bouquets (4109/4105/4110) aren't in the region table, so those pairs won't
 resolve to a name.
 
+### Sky schedule endpoint behaviour
+
+Observed on 2026-10-05; none of this is documented by Sky.
+
+- `/schedule/{date}/{sids}` accepts at most 20 SIDs; 21 or more returns HTTP 400 ("Invalid sid count").
+  A batched response has one entry per SID, identical to the single-SID response for that SID.
+- The API is HTTP/1.1 only and responses carry `Cache-Control: max-age` of up to 59 seconds.
+- A date's schedule starts the previous evening (about 22:00 London time, plus whatever was already on
+  air then), so consecutive day files overlap.
+- **Today's date is unstable.** Two fetches a few minutes apart differ on a dozen or more channels —
+  mostly programmes from the previous evening appearing or disappearing at the head of the list, plus
+  the odd episode number — whether fetched singly or batched. Today's partition therefore hashes
+  differently on nearly every run. When checking that a change leaves output unchanged, compare the
+  later dates, and run the unchanged code twice first to see how much the data differs on its own.
+
 ## CI/CD
 
 GitHub Actions (`.github/workflows/update-epg.yml`) runs every 12 hours:
 
 1. `update` job — builds in `swift:6.2.0-jammy`, fetches EPG data with `--site-dir ./site`,
-   auto-commits `epg.json`, `epg.json.gz`, and `tmdb-cache.json`, and uploads `site/` (plus
-   `cloudflare/_headers`) as an artifact.
+   auto-commits `tmdb-cache.json`, and uploads `site/` (plus `cloudflare/_headers`) as an artifact.
+   The single-file `epg.json` / `epg.json.gz` output is not produced or committed by CI.
 2. `deploy-pages` job — downloads the artifact and deploys it to Cloudflare Pages via
    `wrangler`. No-op until `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets are set.
 
