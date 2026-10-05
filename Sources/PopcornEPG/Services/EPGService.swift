@@ -10,6 +10,8 @@ import Foundation
 struct EPGService {
 
     private static let maxSubbouquetID = 20
+    /// The schedule endpoint rejects requests for more than 20 SIDs with HTTP 400 ("Invalid sid count").
+    private static let maxSIDsPerScheduleRequest = 20
 
     private let apiClient: SkyAPIClient
     private let maxConcurrentRequests: Int
@@ -125,18 +127,22 @@ extension EPGService {
             schedulesBySID[channel.sid] = [:]
         }
 
+        let channelBatches = Self.scheduleRequestBatches(of: channels)
+
         for date in dates {
-            await withTaskGroup(of: (String, [Programme]).self) { group in
-                for channel in channels {
+            await withTaskGroup(of: [(String, [Programme])].self) { group in
+                for batch in channelBatches {
                     group.addTask {
                         await semaphore.wait()
                         defer { Task { await semaphore.signal() } }
-                        return await self.fetchChannelSchedule(channel: channel, date: date)
+                        return await self.fetchBatchSchedules(channels: batch, date: date)
                     }
                 }
 
-                for await (sid, programmes) in group {
-                    schedulesBySID[sid]?[date] = programmes
+                for await results in group {
+                    for (sid, programmes) in results {
+                        schedulesBySID[sid]?[date] = programmes
+                    }
                 }
             }
 
@@ -146,34 +152,70 @@ extension EPGService {
         return schedulesBySID
     }
 
+    private static func scheduleRequestBatches(of channels: [Channel]) -> [[Channel]] {
+        stride(from: 0, to: channels.count, by: maxSIDsPerScheduleRequest).map { start in
+            Array(channels[start ..< min(start + maxSIDsPerScheduleRequest, channels.count)])
+        }
+    }
+
+    private func fetchBatchSchedules(channels: [Channel], date: String) async -> [(String, [Programme])] {
+        if channels.count == 1, let channel = channels.first {
+            return await [fetchChannelSchedule(channel: channel, date: date)]
+        }
+
+        do {
+            let response = try await apiClient.fetchSchedule(date: date, sids: channels.map(\.sid))
+            let eventsBySID = Self.eventsBySID(in: response)
+            return channels.map { channel in
+                (channel.sid, Self.programmes(from: eventsBySID[channel.sid] ?? []))
+            }
+        } catch {
+            print("Warning: Failed to fetch schedule batch of \(channels.count) channels on \(date): \(error)")
+            var results: [(String, [Programme])] = []
+            for channel in channels {
+                await results.append(fetchChannelSchedule(channel: channel, date: date))
+            }
+            return results
+        }
+    }
+
     private func fetchChannelSchedule(channel: Channel, date: String) async -> (String, [Programme]) {
         let programmes: [Programme]
         do {
-            let response = try await apiClient.fetchSchedule(date: date, sid: channel.sid)
-            programmes = (response.schedule?.first?.events ?? []).map { event in
-                let imageUUID = event.programmeuuid
-                    ?? event.seasonuuid
-                    ?? event.seriesuuid
-
-                return Programme(
-                    title: event.t,
-                    description: Self.cleanDescription(event.sy),
-                    startTime: event.st,
-                    duration: event.d,
-                    seasonNumber: event.seasonnumber,
-                    episodeNumber: event.episodenumber,
-                    isPremiere: event.new ?? false,
-                    imageURL: imageUUID.map {
-                        "https://images.metadata.sky.com/pd-image/\($0)/cover"
-                    }
-                )
-            }
+            let response = try await apiClient.fetchSchedule(date: date, sids: [channel.sid])
+            programmes = Self.programmes(from: response.schedule?.first?.events ?? [])
         } catch {
             print("Warning: Failed to fetch schedule for \(channel.name) (\(channel.sid)) on \(date): \(error)")
             programmes = []
         }
 
         return (channel.sid, programmes)
+    }
+
+    private static func eventsBySID(in response: SkyScheduleResponse) -> [String: [SkyScheduleResponse.Event]] {
+        let entries = (response.schedule ?? []).map { ($0.sid, $0.events ?? []) }
+        return Dictionary(entries) { first, _ in first }
+    }
+
+    private static func programmes(from events: [SkyScheduleResponse.Event]) -> [Programme] {
+        events.map { event in
+            let imageUUID = event.programmeuuid
+                ?? event.seasonuuid
+                ?? event.seriesuuid
+
+            return Programme(
+                title: event.t,
+                description: cleanDescription(event.sy),
+                startTime: event.st,
+                duration: event.d,
+                seasonNumber: event.seasonnumber,
+                episodeNumber: event.episodenumber,
+                isPremiere: event.new ?? false,
+                imageURL: imageUUID.map {
+                    "https://images.metadata.sky.com/pd-image/\($0)/cover"
+                }
+            )
+        }
     }
 
     private func assembleChannels(

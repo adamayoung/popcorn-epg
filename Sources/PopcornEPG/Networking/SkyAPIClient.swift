@@ -28,8 +28,8 @@ struct SkyAPIClient {
         return try await fetch(urlString)
     }
 
-    func fetchSchedule(date: String, sid: String) async throws -> SkyScheduleResponse {
-        let urlString = "\(Self.baseURL)/schedule/\(date)/\(sid)"
+    func fetchSchedule(date: String, sids: [String]) async throws -> SkyScheduleResponse {
+        let urlString = "\(Self.baseURL)/schedule/\(date)/\(sids.joined(separator: ","))"
         return try await fetch(urlString)
     }
 
