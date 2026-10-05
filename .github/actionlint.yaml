@@ -1,0 +1,4 @@
+# GitHub-hosted runner labels that actionlint's built-in list does not know yet.
+self-hosted-runner:
+  labels:
+    - xcode-27

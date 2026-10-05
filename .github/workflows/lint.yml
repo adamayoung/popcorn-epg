@@ -1,0 +1,55 @@
+name: Lint
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/lint.yml"
+      - ".swiftformat"
+      - ".swiftlint.yml"
+      - ".swift-version"
+      - "**/*.swift"
+  workflow_dispatch:
+
+concurrency:
+  group: "lint-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      SWIFTLINT_VERSION: 0.65.1
+      SWIFTFORMAT_VERSION: 0.63.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install SwiftLint and SwiftFormat
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/lint-bin"
+
+          curl -fsSL "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o "${RUNNER_TEMP}/swiftlint.zip"
+          unzip -oq "${RUNNER_TEMP}/swiftlint.zip" -d "${RUNNER_TEMP}/swiftlint"
+          install "$(find "${RUNNER_TEMP}/swiftlint" -name swiftlint -type f | head -1)" "${RUNNER_TEMP}/lint-bin/swiftlint"
+
+          curl -fsSL "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip" -o "${RUNNER_TEMP}/swiftformat.zip"
+          unzip -oq "${RUNNER_TEMP}/swiftformat.zip" -d "${RUNNER_TEMP}/swiftformat"
+          install "$(find "${RUNNER_TEMP}/swiftformat" -name swiftformat -type f | head -1)" "${RUNNER_TEMP}/lint-bin/swiftformat"
+
+          echo "${RUNNER_TEMP}/lint-bin" >> "${GITHUB_PATH}"
+          "${RUNNER_TEMP}/lint-bin/swiftlint" version
+          "${RUNNER_TEMP}/lint-bin/swiftformat" --version
+
+      - name: SwiftLint
+        run: swiftlint --strict .
+
+      - name: SwiftFormat
+        run: swiftformat --lint .

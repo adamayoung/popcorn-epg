@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test.yml"
+      - "**/*.swift"
+      - "Package.swift"
+      - "Package.resolved"
+      - "Tests/**"
+  workflow_dispatch:
+
+concurrency:
+  group: "test-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build and Test
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Keyed on this file and the resolved dependency graph: a toolchain or
+      # dependency change invalidates it, and the restore prefix lets a
+      # dependency bump start from the previous build.
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-test-${{ hashFiles('.github/workflows/test.yml') }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-test-${{ hashFiles('.github/workflows/test.yml') }}-
+
+      - name: Build
+        run: swift build --build-tests -Xswiftc -warnings-as-errors
+
+      - name: Test
+        run: swift test --skip-build --filter PopcornEPGTests
+
+      - name: Build for Release
+        run: swift build -c release -Xswiftc -warnings-as-errors
+
+  build-test-linux:
+    name: Build and Test (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2.0-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build
+        run: swift build --build-tests -Xswiftc -warnings-as-errors
+
+      - name: Test
+        run: swift test --skip-build --filter PopcornEPGTests
+
+      - name: Build for Release
+        run: swift build -c release -Xswiftc -warnings-as-errors
