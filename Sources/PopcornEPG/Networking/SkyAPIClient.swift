@@ -19,8 +19,12 @@ struct SkyAPIClient {
 
     private let urlSession: URLSession
 
-    init(urlSession: URLSession = .shared) {
-        self.urlSession = urlSession
+    init(maxConnectionsPerHost: Int) {
+        // URLSession defaults to 6 connections per host and the Sky API is HTTP/1.1 only, which would cap
+        // concurrency below the caller's request limit.
+        let configuration = URLSessionConfiguration.default
+        configuration.httpMaximumConnectionsPerHost = maxConnectionsPerHost
+        self.urlSession = URLSession(configuration: configuration)
     }
 
     func fetchServices(bouquetID: Int, subbouquetID: Int) async throws -> SkyServicesResponse {

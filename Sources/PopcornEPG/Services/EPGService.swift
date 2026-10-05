@@ -16,8 +16,8 @@ struct EPGService {
     private let apiClient: SkyAPIClient
     private let maxConcurrentRequests: Int
 
-    init(apiClient: SkyAPIClient = SkyAPIClient(), maxConcurrentRequests: Int = 20) {
-        self.apiClient = apiClient
+    init(maxConcurrentRequests: Int = 20) {
+        self.apiClient = SkyAPIClient(maxConnectionsPerHost: maxConcurrentRequests)
         self.maxConcurrentRequests = maxConcurrentRequests
     }
 
