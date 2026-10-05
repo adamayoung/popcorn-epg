@@ -33,8 +33,10 @@ jobs:
       - name: Build
         run: swift build -c release -Xswiftc -warnings-as-errors
 
+      # Run the binary from the Build step directly: `swift run` without the same
+      # -Xswiftc flags recompiles the module first.
       - name: Run EPG fetcher
-        run: swift run -c release PopcornEPG --tmdb-api-key "$TMDB_API_KEY" --site-dir ./site
+        run: .build/release/PopcornEPG --tmdb-api-key "$TMDB_API_KEY" --site-dir ./site
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
 
