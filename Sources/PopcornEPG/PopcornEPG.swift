@@ -48,6 +48,8 @@ struct PopcornEPG: AsyncParsableCommand {
     var siteDir: String?
 
     mutating func run() async throws {
+        StandardOutput.useLineBuffering()
+
         let dates = generateDates(count: days)
         let epgService = EPGService()
 

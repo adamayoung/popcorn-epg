@@ -74,6 +74,9 @@ Source tree (`Sources/PopcornEPG/`):
   `writeSingleFile`) and/or partitioned site (`--site-dir`). Single-file outputs use
   `atomicWrite` (write `.tmp`, remove, move). zlib via `Compression` on Apple, python3
   fallback on Linux. JSON encoded with `.sortedKeys`.
+- `StandardOutput.swift` — `useLineBuffering()`, called first in `run()` so progress lines appear as they
+  happen when stdout is piped (CI logs). Kept in its own file because Swift 6 on Linux only accepts Glibc's
+  `stdout` global via `@preconcurrency import Glibc` in a file that does not import Foundation first.
 - `Models/`
   - `Channel.swift` — `Channel` (sid, name, logoURL, isHD, `type: ChannelType`,
     `channelNumbers: [ChannelNumberMapping]`, `schedules: [DaySchedule]`), `ChannelType`
@@ -111,7 +114,8 @@ Source tree (`Sources/PopcornEPG/`):
     (TV only for episodic titles; otherwise movies, then TV), then one details request using
     `append_to_response` for release dates / content ratings, keywords and watch providers. A failed
     details request leaves all detail fields empty for that title.
-  - `TMDbCache.swift` — actor-backed JSON cache (disposable; safe to delete/regenerate).
+  - `TMDbCache.swift` — actor-backed JSON cache (disposable; safe to delete/regenerate). `save()` drops
+    expired entries (30-day TTL for found titles, 7-day for not-found) so the committed file stays bounded.
   - `SiteWriter.swift` — partitioned output: `channels.json` (directory, no schedules),
     `regions.json` (static `Region.all` lookup), `schedules/<date>.json` (one per day),
     `manifest.json` (generatedAt + per-file SHA-256/size).
