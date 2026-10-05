@@ -11,7 +11,7 @@ import Foundation
     import FoundationNetworking
 #endif
 
-struct SkyAPIClient {
+struct SkyAPIClient: SkyAPI {
 
     private static let baseURL = "https://awk.epgsky.com/hawk/linear"
     private static let maxRetries = 3

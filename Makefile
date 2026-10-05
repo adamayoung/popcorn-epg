@@ -1,6 +1,5 @@
 TARGET = PopcornEPG
-# TEST_TARGET = TMDbTests
-# INTEGRATION_TEST_TARGET = TMDbIntegrationTests
+TEST_TARGET = PopcornEPGTests
 
 SWIFT_CONTAINER_IMAGE = swift:6.2.0-jammy
 

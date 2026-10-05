@@ -22,6 +22,11 @@ let package = Package(
                 .product(name: "TMDb", package: "TMDb"),
                 .product(name: "Crypto", package: "swift-crypto")
             ]
+        ),
+        .testTarget(
+            name: "PopcornEPGTests",
+            dependencies: ["PopcornEPG"],
+            resources: [.copy("Fixtures")]
         )
     ]
 )

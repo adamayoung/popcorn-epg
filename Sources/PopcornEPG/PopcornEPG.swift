@@ -50,15 +50,15 @@ struct PopcornEPG: AsyncParsableCommand {
     mutating func run() async throws {
         StandardOutput.useLineBuffering()
 
-        let dates = generateDates(count: days)
+        let dates = Self.generateDates(count: days)
         let epgService = EPGService()
 
         print("Fetching channels from all bouquets...")
         let allChannels = await epgService.fetchAllChannels()
         print("Found \(allChannels.count) unique channels (excluding adult).")
 
-        let requestedNumbers = parseChannelNumbers(channels)
-        let selectedChannels = filterChannels(allChannels, byNumbers: requestedNumbers)
+        let requestedNumbers = Self.parseChannelNumbers(channels)
+        let selectedChannels = Self.filterChannels(allChannels, byNumbers: requestedNumbers)
         if let requestedNumbers {
             let list = requestedNumbers.sorted().joined(separator: ", ")
             print("Filtered to \(selectedChannels.count) channel(s) matching: \(list).")
@@ -166,7 +166,7 @@ struct PopcornEPG: AsyncParsableCommand {
 
     /// Parses the `--channels` value into a set of channel numbers, or `nil`
     /// when the option is absent/empty (meaning "all channels").
-    private func parseChannelNumbers(_ value: String?) -> Set<String>? {
+    static func parseChannelNumbers(_ value: String?) -> Set<String>? {
         guard let value else {
             return nil
         }
@@ -181,7 +181,7 @@ struct PopcornEPG: AsyncParsableCommand {
 
     /// Keeps only channels exposing one of the requested channel numbers.
     /// Returns all channels when no filter is supplied.
-    private func filterChannels(_ channels: [Channel], byNumbers numbers: Set<String>?) -> [Channel] {
+    static func filterChannels(_ channels: [Channel], byNumbers numbers: Set<String>?) -> [Channel] {
         guard let numbers else {
             return channels
         }
@@ -191,13 +191,12 @@ struct PopcornEPG: AsyncParsableCommand {
         }
     }
 
-    private func generateDates(count: Int) -> [String] {
+    static func generateDates(count: Int, from today: Date = Date()) -> [String] {
         let calendar = Calendar.current
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd"
         formatter.timeZone = TimeZone(identifier: "Europe/London")
 
-        let today = Date()
         return (0 ..< count).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset, to: today) else {
                 return nil

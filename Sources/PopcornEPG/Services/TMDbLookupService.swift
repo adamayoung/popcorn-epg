@@ -13,14 +13,18 @@ struct TMDbLookupService {
     /// ISO 3166-1 country code used for certifications and watch providers.
     private static let region = "GB"
 
-    private let tmdbClient: TMDbClient
+    private let metadataSource: any TMDbMetadataSource
     private let cache: TMDbCache
     private let semaphore: AsyncSemaphore
 
-    init(apiKey: String, cache: TMDbCache) {
-        self.tmdbClient = TMDbClient(apiKey: apiKey)
+    init(metadataSource: any TMDbMetadataSource, cache: TMDbCache) {
+        self.metadataSource = metadataSource
         self.cache = cache
         self.semaphore = AsyncSemaphore(limit: 10)
+    }
+
+    init(apiKey: String, cache: TMDbCache) {
+        self.init(metadataSource: TMDbClient(apiKey: apiKey), cache: cache)
     }
 
     func enrichProgrammes(in epgData: EPGData) async -> EPGData {
@@ -41,7 +45,7 @@ struct TMDbLookupService {
 
 extension TMDbLookupService {
 
-    private func collectUniqueTitles(from epgData: EPGData) -> [String: Bool] {
+    func collectUniqueTitles(from epgData: EPGData) -> [String: Bool] {
         var uniqueTitles: [String: Bool] = [:]
         for channel in epgData.channels {
             for schedule in channel.schedules {
@@ -120,23 +124,17 @@ extension TMDbLookupService {
     private func searchIDs(for title: String, isTVSeries: Bool) async -> (movieID: Int?, tvSeriesID: Int?) {
         do {
             if isTVSeries {
-                let results = try await tmdbClient.search.searchTVSeries(
-                    query: title, filter: nil, page: nil, language: nil
-                )
+                let results = try await metadataSource.searchTVSeries(query: title)
                 if let first = results.results.first {
                     return (nil, first.id)
                 }
             } else {
-                let movieResults = try await tmdbClient.search.searchMovies(
-                    query: title, filter: nil, page: nil, language: nil
-                )
+                let movieResults = try await metadataSource.searchMovies(query: title)
                 if let first = movieResults.results.first {
                     return (first.id, nil)
                 }
 
-                let tvResults = try await tmdbClient.search.searchTVSeries(
-                    query: title, filter: nil, page: nil, language: nil
-                )
+                let tvResults = try await metadataSource.searchTVSeries(query: title)
                 if let first = tvResults.results.first {
                     return (nil, first.id)
                 }
@@ -169,8 +167,8 @@ extension TMDbLookupService {
     /// field empty for this title.
     private func fetchMovieDetails(_ movieID: Int, title: String) async -> TMDbDetails {
         do {
-            let response = try await tmdbClient.movies.details(
-                forMovie: movieID, appending: [.releaseDates, .keywords, .watchProviders], language: nil
+            let response = try await metadataSource.movieDetails(
+                forMovie: movieID, appending: [.releaseDates, .keywords, .watchProviders]
             )
 
             return TMDbDetails(
@@ -191,8 +189,8 @@ extension TMDbLookupService {
     /// content ratings (rather than release dates) for the GB certification.
     private func fetchTVSeriesDetails(_ tvSeriesID: Int, title: String) async -> TMDbDetails {
         do {
-            let response = try await tmdbClient.tvSeries.details(
-                forTVSeries: tvSeriesID, appending: [.contentRatings, .keywords, .watchProviders], language: nil
+            let response = try await metadataSource.tvSeriesDetails(
+                forTVSeries: tvSeriesID, appending: [.contentRatings, .keywords, .watchProviders]
             )
 
             return TMDbDetails(
@@ -217,7 +215,7 @@ extension TMDbLookupService {
 
     /// The GB/BBFC certification from a movie's release dates: the first
     /// non-empty certification among the GB country's release dates.
-    private static func gbCertification(from releaseDates: [MovieReleaseDatesByCountry]) -> String? {
+    static func gbCertification(from releaseDates: [MovieReleaseDatesByCountry]) -> String? {
         guard let gbReleases = releaseDates.first(where: { $0.countryCode == region }) else {
             return nil
         }
@@ -228,7 +226,7 @@ extension TMDbLookupService {
     }
 
     /// The GB certification from a TV series' content ratings.
-    private static func gbCertification(from contentRatings: [ContentRating]) -> String? {
+    static func gbCertification(from contentRatings: [ContentRating]) -> String? {
         guard let gbRating = contentRatings.first(where: { $0.countryCode == region }) else {
             return nil
         }
@@ -238,7 +236,7 @@ extension TMDbLookupService {
 
     /// GB streaming provider names — flat-rate (subscription), ad-supported, and
     /// free, in that priority order, deduplicated. Buy/rent are excluded.
-    private static func gbWatchProviders(from providersByCountry: [String: ShowWatchProvider]?) -> [String]? {
+    static func gbWatchProviders(from providersByCountry: [String: ShowWatchProvider]?) -> [String]? {
         guard let streaming = providersByCountry?[region] else {
             return nil
         }

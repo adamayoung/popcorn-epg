@@ -13,12 +13,19 @@ struct EPGService {
     /// The schedule endpoint rejects requests for more than 20 SIDs with HTTP 400 ("Invalid sid count").
     private static let maxSIDsPerScheduleRequest = 20
 
-    private let apiClient: SkyAPIClient
+    private let apiClient: any SkyAPI
     private let maxConcurrentRequests: Int
 
-    init(maxConcurrentRequests: Int = 20) {
-        self.apiClient = SkyAPIClient(maxConnectionsPerHost: maxConcurrentRequests)
+    init(apiClient: any SkyAPI, maxConcurrentRequests: Int = 20) {
+        self.apiClient = apiClient
         self.maxConcurrentRequests = maxConcurrentRequests
+    }
+
+    init(maxConcurrentRequests: Int = 20) {
+        self.init(
+            apiClient: SkyAPIClient(maxConnectionsPerHost: maxConcurrentRequests),
+            maxConcurrentRequests: maxConcurrentRequests
+        )
     }
 
     func fetchAllChannels() async -> [Channel] {
@@ -67,7 +74,7 @@ extension EPGService {
         }
     }
 
-    private func buildChannels(
+    func buildChannels(
         from allServices: [(service: SkyServicesResponse.Service, region: RegionRef)]
     ) -> [Channel] {
         var channelsBySID: [String: (service: SkyServicesResponse.Service, numbersByRegion: [RegionRef: String])] = [:]
@@ -152,7 +159,7 @@ extension EPGService {
         return schedulesBySID
     }
 
-    private static func scheduleRequestBatches(of channels: [Channel]) -> [[Channel]] {
+    static func scheduleRequestBatches(of channels: [Channel]) -> [[Channel]] {
         stride(from: 0, to: channels.count, by: maxSIDsPerScheduleRequest).map { start in
             Array(channels[start ..< min(start + maxSIDsPerScheduleRequest, channels.count)])
         }
@@ -192,12 +199,12 @@ extension EPGService {
         return (channel.sid, programmes)
     }
 
-    private static func eventsBySID(in response: SkyScheduleResponse) -> [String: [SkyScheduleResponse.Event]] {
+    static func eventsBySID(in response: SkyScheduleResponse) -> [String: [SkyScheduleResponse.Event]] {
         let entries = (response.schedule ?? []).map { ($0.sid, $0.events ?? []) }
         return Dictionary(entries) { first, _ in first }
     }
 
-    private static func programmes(from events: [SkyScheduleResponse.Event]) -> [Programme] {
+    static func programmes(from events: [SkyScheduleResponse.Event]) -> [Programme] {
         events.map { event in
             let imageUUID = event.programmeuuid
                 ?? event.seasonuuid
@@ -256,7 +263,7 @@ extension EPGService {
         pattern: #"\s*\[(AD|HD|S|SL|W|BSL|3D|UHD|PG|CE|,\s*)*\]\s*"#
     )
 
-    private static func cleanDescription(_ description: String?) -> String? {
+    static func cleanDescription(_ description: String?) -> String? {
         guard let description, !description.isEmpty else {
             return nil
         }
