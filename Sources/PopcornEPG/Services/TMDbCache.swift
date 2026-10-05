@@ -57,12 +57,7 @@ actor TMDbCache {
     }
 
     func lookup(_ title: String) -> TMDbCacheEntry? {
-        guard let entry = entries[title] else {
-            return nil
-        }
-
-        let ttl = entry.hasResult ? Self.defaultTTL : Self.notFoundTTL
-        if entry.isExpired(ttl: ttl) {
+        guard let entry = entries[title], !Self.isExpired(entry) else {
             return nil
         }
 
@@ -78,12 +73,19 @@ actor TMDbCache {
             return
         }
 
+        // Expired entries are never returned by `lookup`, so keeping them only grows the file.
+        entries = entries.filter { !Self.isExpired($0.value) }
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
 
         let data = try encoder.encode(entries)
         try data.write(to: fileURL)
+    }
+
+    private static func isExpired(_ entry: TMDbCacheEntry) -> Bool {
+        entry.isExpired(ttl: entry.hasResult ? defaultTTL : notFoundTTL)
     }
 
 }
