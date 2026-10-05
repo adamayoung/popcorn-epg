@@ -44,6 +44,15 @@ make test                   # Run tests (macOS)
 make test-linux             # Run tests in Docker
 ```
 
+`Tests/PopcornEPGTests` uses Swift Testing and runs offline: `SkyAPI` and `TMDbMetadataSource` are
+replaced by recording stubs (`SkyAPIStub`, `TMDbMetadataSourceStub`), and `TMDbCache` takes an
+injectable clock. `Fixtures/` holds real Sky responses captured on 2026-10-05 (a 20-SID schedule batch,
+the matching single-SID response, and the 4101/1 services list) plus `expected-schedule-20261006.json`,
+a golden day file generated from the current code. The golden test fails on any output change;
+regenerate the expected file only when the change is intended. Tests pin current behaviour, including
+quirks (see test names such as `cleanDescriptionJoinsWordsAroundMidTextTag`), so a failing test means
+the output changed, not necessarily that the code is wrong.
+
 ## Code Style
 
 - Swift 6.2, macOS 13+ minimum
