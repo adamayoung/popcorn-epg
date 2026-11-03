@@ -16,16 +16,13 @@ struct EPGService {
     private let apiClient: any SkyAPI
     private let maxConcurrentRequests: Int
 
-    init(apiClient: any SkyAPI, maxConcurrentRequests: Int = 20) {
+    init(apiClient: any SkyAPI, maxConcurrentRequests: Int = SkyAPIClient.maxConnectionsPerHost) {
         self.apiClient = apiClient
         self.maxConcurrentRequests = maxConcurrentRequests
     }
 
-    init(maxConcurrentRequests: Int = 20) {
-        self.init(
-            apiClient: SkyAPIClient(maxConnectionsPerHost: maxConcurrentRequests),
-            maxConcurrentRequests: maxConcurrentRequests
-        )
+    init() {
+        self.init(apiClient: SkyAPIClient())
     }
 
     func fetchAllChannels() async -> [Channel] {

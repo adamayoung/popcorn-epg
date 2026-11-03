@@ -13,19 +13,21 @@ import Foundation
 
 struct SkyAPIClient: SkyAPI {
 
+    static let maxConnectionsPerHost = 20
+
     private static let baseURL = "https://awk.epgsky.com/hawk/linear"
     private static let maxRetries = 3
     private static let retryableStatusCodes: Set<Int> = [429, 500, 502, 503, 504]
 
-    private let urlSession: URLSession
-
-    init(maxConnectionsPerHost: Int) {
+    /// Static so it is never deallocated: on Linux, swift-corelibs-foundation can abort the process while
+    /// freeing a URLSession ("_MultiHandle deallocated with non-zero retain count").
+    private static let urlSession: URLSession = {
         // URLSession defaults to 6 connections per host and the Sky API is HTTP/1.1 only, which would cap
         // concurrency below the caller's request limit.
         let configuration = URLSessionConfiguration.default
         configuration.httpMaximumConnectionsPerHost = maxConnectionsPerHost
-        self.urlSession = URLSession(configuration: configuration)
-    }
+        return URLSession(configuration: configuration)
+    }()
 
     func fetchServices(bouquetID: Int, subbouquetID: Int) async throws -> SkyServicesResponse {
         let urlString = "\(Self.baseURL)/services/\(bouquetID)/\(subbouquetID)"
@@ -51,7 +53,7 @@ struct SkyAPIClient: SkyAPI {
             }
 
             do {
-                let (data, response) = try await urlSession.data(from: url)
+                let (data, response) = try await Self.urlSession.data(from: url)
 
                 if let httpResponse = response as? HTTPURLResponse {
                     if (200 ..< 300).contains(httpResponse.statusCode) {

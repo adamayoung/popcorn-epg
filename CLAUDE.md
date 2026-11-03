@@ -104,9 +104,12 @@ Source tree (`Sources/PopcornEPG/`):
 - `Networking/`
   - `SkyAPIClient.swift` — base `https://awk.epgsky.com/hawk/linear`. `fetchServices(bouquetID:subbouquetID:)`
     → `/services/{b}/{s}`; `fetchSchedule(date:sids:)` → `/schedule/{date}/{sid,sid,…}` (comma-separated,
-    max 20 SIDs). 3 retries, exponential backoff, retries on 429/500/502/503/504. `init(maxConnectionsPerHost:)`
-    builds a dedicated `URLSession`: the API is HTTP/1.1 only and URLSession's default of 6 connections per
-    host would otherwise cap concurrency below the semaphore limit.
+    max 20 SIDs). 3 retries, exponential backoff, retries on 429/500/502/503/504. Uses a dedicated
+    `static let` `URLSession` with `maxConnectionsPerHost` (20) connections per host: the API is HTTP/1.1
+    only and URLSession's default of 6 would otherwise cap concurrency below the semaphore limit. The
+    session must stay static: on Linux, freeing a URLSession can abort the process during libcurl cleanup
+    (`_MultiHandle deallocated with non-zero retain count`, exit 134), which failed about half the CI runs
+    from 27 Oct to 3 Nov 2026 after all output had been written. A static is never deallocated.
   - `SkyAPIError.swift` — `invalidURL`, `httpError(statusCode:)`, `decodingError`.
 - `Services/`
   - `EPGService.swift` — orchestration. `fetchAllServices()` probes every `Bouquet.all` × subbouquet
@@ -116,8 +119,8 @@ Source tree (`Sources/PopcornEPG/`):
     both preserved). `fetchAllSchedules()` splits channels into batches of 20 SIDs
     (`maxSIDsPerScheduleRequest`) and fans out one request per batch/date under a 20-permit
     `AsyncSemaphore`, matching response entries to channels by SID. If a batch request fails, its
-    channels are fetched one at a time so a bad channel only loses itself. `init(maxConcurrentRequests:)`
-    creates the `SkyAPIClient` with the same number as its connection limit. `cleanDescription` strips
+    channels are fetched one at a time so a bad channel only loses itself. `init()` uses `SkyAPIClient`
+    with the semaphore limit set to `SkyAPIClient.maxConnectionsPerHost`. `cleanDescription` strips
     `[AD][HD][S]…` feature tags via regex.
   - `TMDbLookupService.swift` — enriches programmes with TMDb metadata. Per uncached title: a search
     (TV only for episodic titles; otherwise movies, then TV), then one details request using
