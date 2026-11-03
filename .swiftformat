@@ -12,6 +12,7 @@
 --funcattributes prev-line
 --typeattributes prev-line
 --varattributes same-line
+--complexattributes prev-line
 
 --disable wrapMultilineStatementBraces
 --disable redundantLetError
